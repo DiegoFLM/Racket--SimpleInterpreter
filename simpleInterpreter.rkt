@@ -1,3 +1,6 @@
+;Author: Diego Fabián Ledesma Motta
+;diego.ledesma@correounivalle.edu.co
+
 #lang eopl
 
 ;Ambientes
@@ -56,6 +59,8 @@
               (if (number? list-index-r)
                 (+ list-index-r 1)
                 #f))))))
+;*************************************************************************************
+
 
 
 
@@ -67,12 +72,19 @@
   (numericVal (digit (arbno digit)) number)
   (numericVal (digit (arbno digit) "." digit (arbno digit)) number)
   (numericVal ("-" digit (arbno digit)) number)
-  (numericVal ("-" digit (arbno digit) "." digit (arbno digit) ) number))
-  )
+  (numericVal ("-" digit (arbno digit) "." digit (arbno digit) ) number)
+  (boolVal ("#yep") string)
+  (boolVal ("#nope") string)
+  ))
 
 (define just-scan
   (sllgen:make-string-scanner lexic'()))
 
+(define returnString
+  (lambda (str)
+    (substring str 1 (-(string-length str)1) )
+    )
+  )
 
 (define gramatic
   '(
@@ -80,18 +92,21 @@
     (expression (numericVal) num)
     (expression (id) var)
     (expression (text) string-exp)
+    (expression (boolVal) bool-exp)
     (expression (primitive "(" (separated-list expression ",") ")") computation)
+
+    (expression ("if" expression "{" "then" expression "else" expression "}") if-exp)
+    (expression ("let" "(" (separated-list id "=" expression ",") ")" "in" expression) let-exp)
+    
     (primitive ("+") sumPrim)
     (primitive ("-") subPrim)
     (primitive ("*") prodPrim)
     (primitive ("/") divPrim)
     (primitive ("concat") concatPrim)
     (primitive ("length") lengthPrim)
-
-
-
     )
  )
+
 
 (sllgen:make-define-datatypes lexic gramatic)
 
@@ -123,18 +138,25 @@
     (cases expression exp
       (num (n) n)
       (string-exp (t) t)
+      (bool-exp (b) (if (equal? b "#yep") #t #f))
       (var (v) (apply-env env v))
       (computation (prim lexp) 
           (let
               (
-               (evaluatedL (map (lambda (e) (eval-expression e env)) lexp))
+                 (evaluatedL (map (lambda (e) (eval-expression e env)) lexp))
                )
             (eval-prim prim evaluatedL)
            ))
+      (if-exp (condition condTrue condFalse)
+              (if (eval-expression condition env) (eval-expression condTrue env) (eval-expression condFalse env)))
+      ;(let-exp (idList valuesList exp) (apply-env (extend-env idList
+       ;                                 (map (lambda (vLst) (eval-expression vLst env)) valuesList) env) exp))
 
+      
+      (else #f)
         )
     )
-  )
+)
 
 
 (define eval-prim
@@ -142,6 +164,9 @@
     (cases primitive prim
     (sumPrim () (add lValues))
     (concatPrim () (concatenate lValues))
+    (subPrim () (subtract lValues))
+    (prodPrim () (product lValues))
+    (lengthPrim () (length lValues))
     (else #f)
 
     ))
@@ -155,8 +180,18 @@
 (define concatenate
   (lambda (cl)
     (if (null? cl) ""
-        (string-append (car cl) (concatenate (cdr cl)))))
+        (string-append (returnString (car cl)) (concatenate (cdr cl)))))
  )
 
+(define subtract
+  (lambda (l)
+    (if (null? l) 0
+        (- (car l) (subtract (cdr l))))))
 
+(define product
+  (lambda (l)
+    (if (null? l) 1
+        (* (car l) (product (cdr l))))))
 
+(define length
+  (lambda (l) (if (null? l) 0 (+ 1 (length (cdr l))))))
